@@ -1,0 +1,8 @@
+build/
+config.txt
+.env
+*.exe
+*.o
+*.obj
+.vscode/
+.idea/
