@@ -2,8 +2,10 @@
 
 #include "domain/exceptions.hpp"
 
+#include <cctype>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <string>
 
 namespace cli {
@@ -20,6 +22,54 @@ std::string formatDuration(int sec)
     const int m = sec / 60;
     const int s = sec % 60;
     return std::to_string(m) + ":" + (s < 10 ? "0" : "") + std::to_string(s);
+}
+
+std::string trimCopy(std::string s)
+{
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.front()))) {
+        s.erase(s.begin());
+    }
+    while (!s.empty() && std::isspace(static_cast<unsigned char>(s.back()))) {
+        s.pop_back();
+    }
+    return s;
+}
+
+// Принимает "241" или "4:01" / "04:01".
+std::optional<int> parseDuration(const std::string& raw)
+{
+    const std::string s = trimCopy(raw);
+    if (s.empty()) {
+        return std::nullopt;
+    }
+
+    const auto colon = s.find(':');
+    if (colon == std::string::npos) {
+        try {
+            const int sec = std::stoi(s);
+            if (sec <= 0) {
+                return std::nullopt;
+            }
+            return sec;
+        } catch (...) {
+            return std::nullopt;
+        }
+    }
+
+    try {
+        const int minutes = std::stoi(s.substr(0, colon));
+        const int seconds = std::stoi(s.substr(colon + 1));
+        if (minutes < 0 || seconds < 0 || seconds >= 60) {
+            return std::nullopt;
+        }
+        const int total = minutes * 60 + seconds;
+        if (total <= 0) {
+            return std::nullopt;
+        }
+        return total;
+    } catch (...) {
+        return std::nullopt;
+    }
 }
 
 } // namespace
@@ -48,6 +98,17 @@ int Menu::readInt(const std::string& prompt)
         }
         std::cout << "Please enter a number.\n";
         clearInput();
+    }
+}
+
+int Menu::readDuration(const std::string& prompt)
+{
+    while (true) {
+        const std::string line = readLine(prompt);
+        if (const auto sec = parseDuration(line)) {
+            return *sec;
+        }
+        std::cout << "Enter duration as seconds (241) or m:ss (4:01).\n";
     }
 }
 
@@ -126,7 +187,7 @@ void Menu::tracksMenu()
                     std::cout << "(no tracks)\n";
                 } else {
                     for (const auto& t : tracks) {
-                        std::cout << "  #" << t.id << "  " << t.artist << " — "
+                        std::cout << "  #" << t.id << "  " << t.artist << " - "
                                   << t.title << "  [" << formatDuration(t.durationSec)
                                   << "]\n";
                     }
@@ -134,14 +195,14 @@ void Menu::tracksMenu()
             } else if (choice == 2) {
                 const std::string title = readLine("Title: ");
                 const std::string artist = readLine("Artist: ");
-                const int duration = readInt("Duration (seconds): ");
+                const int duration = readDuration("Duration (seconds or m:ss): ");
                 const auto t = service_.addTrack(title, artist, duration);
                 std::cout << "Created track #" << t.id << "\n";
             } else if (choice == 3) {
                 const int id = readInt("Track id: ");
                 const std::string title = readLine("New title: ");
                 const std::string artist = readLine("New artist: ");
-                const int duration = readInt("New duration (seconds): ");
+                const int duration = readDuration("New duration (seconds or m:ss): ");
                 service_.updateTrack(id, title, artist, duration);
                 std::cout << "Updated.\n";
             } else if (choice == 4) {
@@ -232,7 +293,7 @@ void Menu::compositionMenu()
                 } else {
                     for (const auto& e : entries) {
                         std::cout << "  " << e.position << ". [#" << e.track.id << "] "
-                                  << e.track.artist << " — " << e.track.title << "  ["
+                                  << e.track.artist << " - " << e.track.title << "  ["
                                   << formatDuration(e.track.durationSec) << "]\n";
                     }
                 }

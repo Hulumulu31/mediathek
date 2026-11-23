@@ -19,6 +19,7 @@ private:
     void compositionMenu();
 
     static int readInt(const std::string& prompt);
+    static int readDuration(const std::string& prompt);
     static std::string readLine(const std::string& prompt);
     static void pause();
 };
